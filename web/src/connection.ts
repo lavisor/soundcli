@@ -14,7 +14,7 @@ export interface Connection {
   send: (c: Cmd) => Promise<string | undefined>;
 }
 
-const token = new URLSearchParams(location.search).get("token") ?? "";
+export const token = new URLSearchParams(location.search).get("token") ?? "";
 
 /** Live mirror of the core over the WebSocket, reconnecting if it drops. */
 export function useConnection(): Connection {

@@ -57,6 +57,18 @@ const MIME: Record<string, string> = {
   ".woff2": "font/woff2",
 };
 
+const AUDIO_MIME: Record<string, string> = {
+  ".mp3": "audio/mpeg",
+  ".m4a": "audio/mp4",
+  ".mp4": "audio/mp4",
+  ".aac": "audio/aac",
+  ".opus": "audio/ogg; codecs=opus",
+  ".ogg": "audio/ogg",
+  ".webm": "audio/webm",
+  ".flac": "audio/flac",
+  ".wav": "audio/wav",
+};
+
 export function tokenMatches(given: string | null, token: string): boolean {
   if (!given) return false;
   const a = Buffer.from(given);
@@ -158,6 +170,10 @@ export async function startGuiServer(
       }
       case "togglePause":
         return pb.togglePause();
+      case "report":
+        return pb.reportBrowser(c.trackId, Number(c.position), Number(c.duration));
+      case "ended":
+        return pb.browserEnded(c.trackId);
       case "seek":
         return pb.seek(c.seconds);
       case "setVolume":
@@ -254,10 +270,77 @@ export async function startGuiServer(
   }
 
   const root = path.resolve(webRoot);
+
+  // Stream a library file to the page's <audio>. The path comes from the
+  // library entry for the id, never from the request. Range support is what
+  // makes seeking work.
+  function serveAudio(req: IncomingMessage, res: ServerResponse, url: URL): void {
+    if (!tokenMatches(url.searchParams.get("token"), token)) {
+      res.writeHead(403).end();
+      return;
+    }
+    let id: string;
+    try {
+      id = decodeURIComponent(url.pathname.slice("/audio/".length));
+    } catch {
+      res.writeHead(400).end();
+      return;
+    }
+    const track = app.library.get(id);
+    let size = 0;
+    try {
+      if (!track) throw new Error("unknown");
+      const st = statSync(track.filePath);
+      if (!st.isFile()) throw new Error("not a file");
+      size = st.size;
+    } catch {
+      res.writeHead(404, { "content-type": "text/plain" }).end("Not found");
+      return;
+    }
+    const type = AUDIO_MIME[path.extname(track!.filePath).toLowerCase()] ?? "application/octet-stream";
+    const m = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range ?? "");
+    let start = 0;
+    let end = size - 1;
+    let status = 200;
+    if (m && (m[1] || m[2])) {
+      if (m[1]) {
+        start = Number(m[1]);
+        if (m[2]) end = Math.min(Number(m[2]), size - 1);
+      } else {
+        start = Math.max(0, size - Number(m[2]));
+      }
+      if (start > end || start >= size) {
+        res.writeHead(416, { "content-range": `bytes */${size}` }).end();
+        return;
+      }
+      status = 206;
+    }
+    res.writeHead(status, {
+      "content-type": type,
+      "content-length": end - start + 1,
+      "accept-ranges": "bytes",
+      "cache-control": "no-store",
+      "x-content-type-options": "nosniff",
+      ...(status === 206 ? { "content-range": `bytes ${start}-${end}/${size}` } : {}),
+    });
+    if (req.method === "HEAD" || size === 0) {
+      res.end();
+      return;
+    }
+    const stream = createReadStream(track!.filePath, { start, end });
+    stream.on("error", () => res.destroy());
+    res.on("close", () => stream.destroy());
+    stream.pipe(res);
+  }
+
   function serveStatic(req: IncomingMessage, res: ServerResponse): void {
     const url = new URL(req.url ?? "/", "http://x");
     if (req.method !== "GET" && req.method !== "HEAD") {
       res.writeHead(405).end();
+      return;
+    }
+    if (url.pathname.startsWith("/audio/")) {
+      serveAudio(req, res, url);
       return;
     }
     // The page itself needs the token; assets are public but useless alone.

@@ -29,6 +29,8 @@ export interface CreateAppOptions {
    * after a short while.
    */
   onMpvStatus?: (text: string | null, opts?: { transient?: boolean }) => void;
+  /** The front end plays the audio itself (the GUI page): skip mpv entirely. */
+  browserAudio?: boolean;
 }
 
 export interface App {
@@ -55,7 +57,7 @@ export interface App {
 }
 
 export async function createApp(opts: CreateAppOptions = {}): Promise<App> {
-  const { initialAdd, onStatus, onMpvStatus } = opts;
+  const { initialAdd, onStatus, onMpvStatus, browserAudio } = opts;
 
   const config = await loadConfig();
   // A link passed on the command line means the user has self-onboarded:
@@ -72,7 +74,8 @@ export async function createApp(opts: CreateAppOptions = {}): Promise<App> {
   // Library is now the source of truth, so drop the legacy yt-dlp archive.
   void fs.rm(legacyArchiveFile, { force: true }).catch(() => {});
   const binaries = await ensureBinaries(onStatus);
-  const playback = new Playback(binaries.mpv);
+  const playback = new Playback(browserAudio ? null : binaries.mpv);
+  if (browserAudio) playback.enableBrowser();
 
   // Recently played: record every track the player actually starts,
   // including auto-advance and next/prev, not just explicit picks.
@@ -127,7 +130,7 @@ export async function createApp(opts: CreateAppOptions = {}): Promise<App> {
   // Auto-install mpv in the background so the rich player "just works".
   // Retried on every launch while it's missing: a one-time flag here once
   // left playback silently broken forever after a single failed attempt.
-  if (!binaries.mpv) {
+  if (!binaries.mpv && !browserAudio) {
     const failed = (): void => {
       // One calm line, then quiet again: the NowPlayingBar hint stays the
       // durable nudge while songs keep opening in the OS default app.

@@ -31,6 +31,8 @@ export type ServerEvent =
 export type ClientCommand = { id: number } & (
   | { cmd: "play"; trackId: string; listIds?: string[] }
   | { cmd: "togglePause" }
+  | { cmd: "report"; trackId: string; position: number; duration: number }
+  | { cmd: "ended"; trackId: string }
   | { cmd: "seek"; seconds: number }
   | { cmd: "setVolume"; volume: number }
   | { cmd: "next" }

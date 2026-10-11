@@ -60,6 +60,7 @@ async function runGui(port: number | undefined, open: boolean): Promise<void> {
     app = await createApp({
       onStatus: (t) => console.log(t),
       onMpvStatus: (t) => gui?.setMpvStatus(t),
+      browserAudio: true,
     });
   } catch (e) {
     console.error(

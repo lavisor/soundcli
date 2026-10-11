@@ -48,7 +48,7 @@ Everything runs from the keyboard, with controls that are quick to pick up. Pres
 sndcli --gui
 ```
 
-Opens the same library, player and download queue in your browser. Options: `--port <n>` to pick a port, `--no-open` to print the link without opening it. Press `ctrl-c` in the terminal to quit.
+Opens the same library, player and download queue in your browser. Songs play right in the page, so mpv isn't needed and no other player opens. Options: `--port <n>` to pick a port, `--no-open` to print the link without opening it. Press `ctrl-c` in the terminal to quit.
 
 Running from a clone of this repo, one command builds the page and starts it:
 
@@ -58,7 +58,7 @@ npm run gui -- --port 4000
 npm run gui -- --no-open
 ```
 
-The page is served only on your own computer (`127.0.0.1`) and the link carries a one-time token, so other sites and other machines can't reach it. Run either the terminal app or the browser one at a time; both write to the same library.
+The page is served only on your own computer (`127.0.0.1`) and the link carries a one-time token, so other sites and other machines can't reach it. Run either the terminal app or the browser one at a time, with a single browser tab open; both write to the same library.
 
 Changing the library folder and converting formats are still terminal-only for now.
 
